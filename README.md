@@ -1,5 +1,6 @@
 ## 1. Project Description
-<hr>
+<br>
+<img src="./images/Credit-Risk-Modelling-1.webp" width='100%'>
 
 In this project, I will be exploring the world of credit risk modeling in banks. To simulate this, I will be using a dataset provided by Lending Club, a peer-to-peer lending company. Though slightly different from the business of traditional banks loan consumers, this project would be a good stepping stone for me to learn the fundamentals of credit risk modeling. 
 
@@ -10,11 +11,10 @@ This project is inspired by https://github.com/allmeidaapedro/Lending-Club-Credi
 I will be utilising the Crisp-DM Data Science Framework seen below to maintain data integrity, especially given the strict financial regulations of Basel III.
 
 <p style="text-align:center;">
-<img src="./1200px-CRISP-DM_Process_Diagram.png" width="30%">
+<img src="./images/1200px-CRISP-DM_Process_Diagram.png" width="50%">
 </p> 
 
 ## 2. Business Understanding & Problem 
-<hr>
 
 ##### 2.1 Business Understanding 
 
@@ -48,4 +48,20 @@ I will be utilising the Crisp-DM Data Science Framework seen below to maintain d
   3. Establish a well justified **credit policy**, e.g. 'Only approve if Expected Loss < $20 000'
 
   4. Apply comprehensive **model evaluation & stress testing techniques** to comply to strict Basel III financial regulations 
+
+
+## 3. Project Structure 
+- **images/**: Contains images needed for storytelling and visualisations 
+- **notebooks/**: Contains Jupyter notebooks for data preprocessing, model building and model evaluation 
+- **artifacts/**: Contains ready-made machine learning models 
+
+
+## 4. Tech Stack 
+- **PySpark** (Big Data processing)
+- **PySurvival** (Survival analysis)
+- **Imbalanced-learn** (SMOTE)
+- **Scikit-learn** (PCA/LDA)
+- **XGBoost** (Gradient boosting) - 待定
+- Numpy... 
+
 
