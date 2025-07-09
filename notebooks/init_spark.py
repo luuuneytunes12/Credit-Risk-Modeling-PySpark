@@ -20,7 +20,7 @@ def start_spark(app_name="Credit Risk Modeling"):
     -------
     SparkSession
     """
-    
+
     builder = (
         SparkSession.builder.appName(app_name)
         .master("local[4]")
@@ -35,4 +35,10 @@ def start_spark(app_name="Credit Risk Modeling"):
     )  # Consistent location for managed tables
 
     spark = configure_spark_with_delta_pip(builder).getOrCreate()
+    
+    print(spark.version)
+    
     return spark
+
+if __name__ == "__main__":
+    spark = start_spark()
