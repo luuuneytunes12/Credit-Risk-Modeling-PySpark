@@ -23,7 +23,7 @@ def start_spark(app_name="Credit Risk Modeling"):
 
     builder = (
         SparkSession.builder.appName(app_name)
-        .master("local[4]")
+        .master("local[*]")
         .config("spark.driver.memory", "4g")
         .config("spark.sql.shuffle.partitions", "8")
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
