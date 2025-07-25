@@ -81,6 +81,7 @@ mlflow-skinny==3.1.1
 nbclient==0.10.2
 nbconvert==7.16.6
 nbformat==5.10.4
+nbimporter==0.3.4
 nest-asyncio==1.6.0
 notebook_shim==0.2.4
 numpy==2.3.1

@@ -1,4 +1,3 @@
-
 # Data manipulation
 from pyspark.sql import functions as F
 from pyspark.sql.functions import (
@@ -56,11 +55,16 @@ import pandas as pd
 import wandb
 import os
 from dotenv import load_dotenv
+
 load_dotenv()
 wandb.login(key=os.getenv("WANDB_API_KEY"))
 
+from pyspark.ml.regression import LinearRegression
+from pyspark import StorageLevel
+
 
 # 1. To train model at each data preprocessing step
+
 
 def sample_and_order(
     initial_df: DataFrame, sample_frac: float, date_col: str = "issue_d"  # Spark df
@@ -294,3 +298,43 @@ def run_model_checkpoint(df, name, date_cutoff, sample_proportion, model_type, g
     )
 
     wandb.finish()
+
+
+# Check multicollinearity across notebooks
+def calculate_vif(df, features, threshold=5.0, sample_frac=0.05, seed=42):
+    """
+    For each feature of the df, calculate the Variance Inflation Factor (VIF) to check for multicollinearity.
+    """
+    work_df = (
+        df.select(features)  # keep only numeric columns
+        .sample(fraction=sample_frac, seed=seed)
+        .persist(
+            StorageLevel.MEMORY_AND_DISK
+        )  # store the sampled in ram, spill to disk if needed (impt since i need to assemble vectors of other features, for each given feature) -> constant ref to this df
+    )
+    _ = work_df.count()  # materialize cache
+
+    vif_scores = []
+
+    # --- 2)  Loop through features to compute VIF -------------
+    for idx, feature in enumerate(features, start=1):
+        other = [c for c in features if c != feature]
+
+        # Assemble other features into a single vector
+        assembler = VectorAssembler(inputCols=other, outputCol="features_vec")
+        temp = assembler.transform(work_df).select("features_vec", feature)
+
+        # Regress feature ~ other features  → get R²
+        lr = LinearRegression(
+            featuresCol="features_vec", labelCol=feature, regParam=0.001
+        )
+        r2 = lr.fit(temp).summary.r2
+
+        vif = float("inf") if r2 >= 1 else 1.0 / (1.0 - r2)
+        vif_scores.append((feature, vif))
+
+    # --- 3)  Split keep vs. drop ------------------------------
+    keep_cols = [(f, v) for f, v in vif_scores if v <= threshold]
+    drop_cols = [(f, v) for f, v in vif_scores if v > threshold]
+
+    return (keep_cols, drop_cols)

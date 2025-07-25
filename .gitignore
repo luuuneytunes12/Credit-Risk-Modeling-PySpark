@@ -16,4 +16,7 @@ notebooks/metastore_db/
 notebooks/derby.log
 
 wandb/
-WANDB_API_KEY=05351994c319be53e7589bc6ea44ded3d7ca267a
+
+
+# Environment Variables and Secretssss
+.env
