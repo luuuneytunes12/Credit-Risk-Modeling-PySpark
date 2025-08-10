@@ -50,6 +50,7 @@ httpx==0.28.1
 idna==3.10
 immutabledict==4.2.1
 importlib_metadata==8.7.0
+iniconfig==2.1.0
 ipykernel==6.29.5
 ipython==9.4.0
 ipython_pygments_lexers==1.1.1
@@ -101,6 +102,7 @@ patsy==1.0.1
 pexpect==4.9.0
 pillow==11.3.0
 platformdirs==4.3.8
+pluggy==1.6.0
 prometheus_client==0.22.1
 prompt_toolkit==3.0.51
 protobuf==5.26.1
@@ -119,6 +121,7 @@ pyparsing==3.2.3
 pyspark==4.0.0
 # Editable install with no version control (pyspark_approx_smote==0.1)
 -e /Users/lunlun/Downloads/Github/Credit-Risk-Modeling-PySpark/pyspark-approx-smote
+pytest==8.4.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 python-json-logger==3.3.0

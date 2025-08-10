@@ -1,7 +1,21 @@
+# =========================
+# Standard library
+# =========================
 import os
+import string
+from datetime import date
+from random import sample  # if you really need it
 
-# == Spark Functions ==
-from pyspark.sql import functions as F
+# =========================
+# Third-party: Environment & Logging
+# =========================
+from dotenv import load_dotenv
+import wandb
+
+# =========================
+# Third-party: PySpark
+# =========================
+from pyspark.sql import DataFrame, functions as F
 from pyspark.sql.functions import (
     col,
     when,
@@ -21,7 +35,6 @@ from pyspark.sql.functions import (
     unix_timestamp,
     from_unixtime,
 )
-
 from pyspark.sql.types import (
     StructType,
     StructField,
@@ -31,40 +44,32 @@ from pyspark.sql.types import (
     DateType,
     NumericType,
 )
-
-from pyspark.ml.linalg import VectorUDT
-from pyspark.sql import DataFrame
-from datetime import date
-
-
-# == SparkML Part ==
-from pyspark.ml.feature import StringIndexer, OneHotEncoder
 from pyspark.ml import Pipeline
-from pyspark.ml.feature import VectorAssembler
-from pyspark.mllib.evaluation import BinaryClassificationMetrics
-from pyspark.ml.classification import LogisticRegression
+from pyspark.ml.feature import StringIndexer, OneHotEncoder, VectorAssembler
+from pyspark.ml.classification import LogisticRegression as SparkLogisticRegression
 from pyspark.ml.evaluation import (
     BinaryClassificationEvaluator,
     MulticlassClassificationEvaluator,
 )
-from pyspark.mllib.evaluation import MulticlassMetrics
+from pyspark.mllib.evaluation import BinaryClassificationMetrics, MulticlassMetrics
 from pyspark.ml.regression import LinearRegression
+from pyspark.ml.linalg import VectorUDT  # if you actually use it
+
+# =========================
+# Third-party: Data (Pandas / NumPy)
+# =========================
+import numpy as np
 import pandas as pd
 
-# == Wandb Logging ==
-import wandb
-
-wandb.login(key=os.getenv("WANDB_API_KEY"))
-
-# == Environment Variables ==
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# == Machine Learning (Pandas & Sklearn) ==
-import numpy as np
+# =========================
+# Third-party: Plotting
+# =========================
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+# =========================
+# Third-party: Scikit-learn
+# =========================
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     confusion_matrix,
@@ -76,14 +81,37 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
+from sklearn.preprocessing import StandardScaler
+from sklearn.utils.class_weight import compute_sample_weight
+
+# =========================
+# Third-party: Statsmodels (VIF)
+# =========================
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+from statsmodels.tools.tools import add_constant
+
+# =========================
+# Project setup
+# =========================
+load_dotenv()
+wandb.login(key=os.getenv("WANDB_API_KEY"))
 
 
+#! Latest
 def train_eval_logistic_with_threshold(
-    X_train, y_train, X_test, y_test, labels=["Non-Default", "Default"]
+    X_train,
+    y_train,
+    X_test,
+    y_test,
+    labels=["Non-Default", "Default"],
+    sample_weight=None,
+    model_type=None,
 ):
-    # Step 1: Train
-    model = LogisticRegression(max_iter=1000)
-    model.fit(X_train, y_train)
+    """Train Logistic Regression Model with threshold, outputs evaluation metrics and logs it to Wandb.
+    Focuses on Default Class metrics, rather than weighted"""
+    # Step 1: Train.
+    model = LogisticRegression(solver="lbfgs", C=1.0, max_iter=1000)
+    model.fit(X_train, y_train, sample_weight=sample_weight)
 
     # Step 2: Predict probabilities
     y_proba = model.predict_proba(X_test)[:, 1]
@@ -149,7 +177,7 @@ def train_eval_logistic_with_threshold(
 
     wandb.log(
         {
-            "Model Type": "Logistic Regression",
+            "Model Type": model_type,
             "Best Threshold": best_thresh,
             "Gini": gini,
             "Accuracy": accuracy,
@@ -164,9 +192,12 @@ def train_eval_logistic_with_threshold(
     wandb.finish()
 
 
-#! Latest: P
 def run_model_checkpoint(
-    train_pdf, test_pdf, run_name, date_cutoff, model_type, run_group
+    train_pdf: DataFrame,
+    test_pdf: DataFrame,
+    run_name: str,
+    model_type: str,
+    run_group: str,
 ):
     """
     Before executing this function, ensure a sampled_df is used to generate train_pdf, test_pdf.
@@ -190,17 +221,18 @@ def run_model_checkpoint(
         group=run_group,
     )
 
-    # == 2. Undersample majority class on train dataset -> Class imbalance handling ==
-    majority = train_pdf[train_pdf["default_status"] == 0]
-    minority = train_pdf[train_pdf["default_status"] == 1]
-    majority_downsampled = majority.sample(n=len(minority), random_state=42)
-    train_pdf_balanced = pd.concat([majority_downsampled, minority]).sample(
-        frac=1, random_state=42
-    )
+    #! == 2. Undersample majority class on train dataset -> Class imbalance handling == (Changed to Class
+    #! Weighting to fit Spark)
+    # majority = train_pdf[train_pdf["default_status"] == 0]
+    # minority = train_pdf[train_pdf["default_status"] == 1]
+    # majority_downsampled = majority.sample(n=len(minority), random_state=42)
+    # train_pdf_balanced = pd.concat([majority_downsampled, minority]).sample(
+    #     frac=1, random_state=42
+    # )
 
     # == 3. Prepare features ==
-    X_train = train_pdf_balanced.drop(columns=["id", "issue_d", "default_status"])
-    y_train = train_pdf_balanced["default_status"]
+    X_train = train_pdf.drop(columns=["id", "issue_d", "default_status"])
+    y_train = train_pdf["default_status"]
 
     X_test = test_pdf.drop(columns=["id", "issue_d", "default_status"])
     y_test = test_pdf["default_status"]
@@ -214,11 +246,21 @@ def run_model_checkpoint(
         columns=X_train_encoded.columns, fill_value=0
     )
 
+    # == Calculate sample weight ==
+    sample_w = compute_sample_weight(class_weight="balanced", y=y_train)
+
     # == 4. Train, Threshold Tune, Evaluate, Wandb Log, Log Reg Model ==
-    train_eval_logistic_with_threshold(X_train_encoded, y_train, X_test_encoded, y_test)
+    train_eval_logistic_with_threshold(
+        X_train=X_train_encoded,
+        y_train=y_train,
+        X_test=X_test_encoded,
+        y_test=y_test,
+        sample_weight=sample_w,
+        model_type="Logistic Regression",
+    )
 
 
-def sample_and_order(
+def sample_split_order(
     initial_df,
     sample_frac,
     cut_off_date,
@@ -238,9 +280,47 @@ def sample_and_order(
     train_pdf = sampled_pdf[sampled_pdf[date_col] <= cut_off_date]
     test_pdf = sampled_pdf[sampled_pdf[date_col] > cut_off_date]
 
+    print(f"train_pdf has {train_pdf.shape[0]} rows, {train_pdf.shape[1]} columns")
+    print(f"test_pdf has {test_pdf.shape[0]} rows, {test_pdf.shape[1]} columns")
+
     return train_pdf, test_pdf
 
 
+def calculate_vif_pandas(df, features, threshold=5.0):
+    """
+    Calculates VIF scores for each feature in a Pandas DataFrame.
+
+    Parameters:
+    - df (DataFrame): Input Pandas DataFrame
+    - features (list of str): List of feature names to test
+    - threshold (float): VIF threshold to drop for multicollinearity
+
+    Returns:
+    - keep_cols: [(feature, VIF)]
+    - drop_cols: [(feature, VIF)]
+    """
+
+    # 1. Standardize features to remove scale effects
+    scaler = StandardScaler()
+    X_scaled = pd.DataFrame(scaler.fit_transform(df[features]), columns=features)
+
+    # 2. Add constant for intercept
+    X_const = add_constant(X_scaled)
+
+    # 3. Calculate VIF for each feature (skip the intercept)
+    vif_scores = []
+    for i in range(1, X_const.shape[1]):  # start at 1 to skip 'const'
+        vif = variance_inflation_factor(X_const.values, i)
+        vif_scores.append((features[i - 1], vif))
+
+    # 4. Split into keep/drop lists
+    keep_cols = [(f, v) for f, v in vif_scores if v <= threshold]
+    drop_cols = [(f, v) for f, v in vif_scores if v > threshold]
+
+    return keep_cols, drop_cols
+
+
+#! Spark Final Model Training
 def oot_train_test_split(
     initial_df: DataFrame, date_cut_off: str
 ) -> tuple[DataFrame, DataFrame]:
@@ -252,26 +332,6 @@ def oot_train_test_split(
     initial_df = initial_df.orderBy(col("issue_d").asc())
     train_df = initial_df.where(col("issue_d") < to_date(lit(date_cut_off)))
     test_df = initial_df.where(col("issue_d") >= to_date(lit(date_cut_off)))
-
-    return (train_df, test_df)
-
-
-def oot_train_test_split_pandas(
-    initial_df: DataFrame, date_cut_off: str
-) -> tuple[DataFrame, DataFrame]:
-    """
-    Takes in Pandas Dataframe.
-    Conducts out-of-time split according to issue_d column, returning (train_df , test_df)
-    """
-    # Ensure issue_d is datetime
-    initial_df["issue_d"] = pd.to_datetime(initial_df["issue_d"])
-
-    # Sort (optional for traceability)
-    initial_df = initial_df.sort_values("issue_d")
-
-    # Split using cut-off
-    train_df = initial_df[initial_df["issue_d"] < pd.to_datetime(date_cut_off)]
-    test_df = initial_df[initial_df["issue_d"] >= pd.to_datetime(date_cut_off)]
 
     return (train_df, test_df)
 
@@ -328,6 +388,45 @@ def build_one_hot_encoding_pipeline(df):
             stages.extend([indexer, encoder])
 
     return Pipeline(stages=stages)
+
+
+# def calculate_vif_spark(df, features, threshold=5.0, sample_frac=0.05, seed=42):
+#     """
+#     For each feature of the df, calculate the Variance Inflation Factor (VIF) to check for multicollinearity.
+#     """
+#     work_df = (
+#         df.select(features)  # keep only numeric columns
+#         .sample(fraction=sample_frac, seed=seed)
+#         .persist(
+#             StorageLevel.MEMORY_AND_DISK
+#         )  # store the sampled in ram, spill to disk if needed (impt since i need to assemble vectors of other features, for each given feature) -> constant ref to this df
+#     )
+#     _ = work_df.count()  # materialize cache
+
+#     vif_scores = []
+
+#     # --- 2)  Loop through features to compute VIF -------------
+#     for idx, feature in enumerate(features, start=1):
+#         other = [c for c in features if c != feature]
+
+#         # Assemble other features into a single vector
+#         assembler = VectorAssembler(inputCols=other, outputCol="features_vec")
+#         temp = assembler.transform(work_df).select("features_vec", feature)
+
+#         # Regress feature ~ other features  → get R²
+#         lr = LinearRegression(
+#             featuresCol="features_vec", labelCol=feature, regParam=0.001
+#         )
+#         r2 = lr.fit(temp).summary.r2
+
+#         vif = float("inf") if r2 >= 1 else 1.0 / (1.0 - r2)
+#         vif_scores.append((feature, vif))
+
+#     # --- 3)  Split keep vs. drop ------------------------------
+#     keep_cols = [(f, v) for f, v in vif_scores if v <= threshold]
+#     drop_cols = [(f, v) for f, v in vif_scores if v > threshold]
+
+#     return (keep_cols, drop_cols)
 
 
 # # Log and Evaluate Temporary Results (Each data preprocessing step)
@@ -485,76 +584,48 @@ def build_one_hot_encoding_pipeline(df):
 
 
 # Check multicollinearity across notebooks
-def calculate_vif(df, features, threshold=5.0, sample_frac=0.05, seed=42):
-    """
-    For each feature of the df, calculate the Variance Inflation Factor (VIF) to check for multicollinearity.
-    """
-    work_df = (
-        df.select(features)  # keep only numeric columns
-        .sample(fraction=sample_frac, seed=seed)
-        .cache()
-    )
-    _ = work_df.count()  # materialize cache
+# def calculate_vif(df, features, threshold=5.0, sample_frac=0.05, seed=42):
+#     """
+#     For each feature of the df, calculate the Variance Inflation Factor (VIF) to check for multicollinearity.
+#     """
+#     work_df = (
+#         df.select(features)  # keep only numeric columns
+#         .sample(fraction=sample_frac, seed=seed)
+#         .cache()
+#     )
+#     _ = work_df.count()  # materialize cache
 
-    vif_scores = []
+#     vif_scores = []
 
-    # --- 2)  Loop through features to compute VIF -------------
-    for idx, feature in enumerate(features, start=1):
-        other = [c for c in features if c != feature]
+#     # --- 2)  Loop through features to compute VIF -------------
+#     for idx, feature in enumerate(features, start=1):
+#         other = [c for c in features if c != feature]
 
-        # Assemble other features into a single vector
-        assembler = VectorAssembler(inputCols=other, outputCol="features_vec")
-        temp = assembler.transform(df).select("features_vec", feature)
+#         # Assemble other features into a single vector
+#         assembler = VectorAssembler(inputCols=other, outputCol="features_vec")
+#         temp = assembler.transform(df).select("features_vec", feature)
 
-        # Regress feature ~ other features  → get R²
-        lr = LinearRegression(
-            featuresCol="features_vec", labelCol=feature, regParam=0.001
-        )
-        r2 = lr.fit(temp).summary.r2
+#         # Regress feature ~ other features  → get R²
+#         lr = LinearRegression(
+#             featuresCol="features_vec", labelCol=feature, regParam=0.001
+#         )
+#         r2 = lr.fit(temp).summary.r2
 
-        vif = float("inf") if r2 >= 1 else 1.0 / (1.0 - r2)
-        vif_scores.append((feature, vif))
+#         vif = float("inf") if r2 >= 1 else 1.0 / (1.0 - r2)
+#         vif_scores.append((feature, vif))
 
-    # --- 3)  Split keep vs. drop ------------------------------
-    keep_cols = [(f, v) for f, v in vif_scores if v <= threshold]
-    drop_cols = [(f, v) for f, v in vif_scores if v > threshold]
+#     # --- 3)  Split keep vs. drop ------------------------------
+#     keep_cols = [(f, v) for f, v in vif_scores if v <= threshold]
+#     drop_cols = [(f, v) for f, v in vif_scores if v > threshold]
 
-    work_df.unpersist()
+#     work_df.unpersist()
 
-    return (keep_cols, drop_cols)
-
-
-import statsmodels
-
-print(statsmodels.__version__)
-
-from statsmodels.stats.outliers_influence import variance_inflation_factor
-from sklearn.preprocessing import StandardScaler
+#     return (keep_cols, drop_cols)
 
 
-def calculate_vif_pandas(df, features, threshold=5.0):
-    """
-    Calculates VIF scores for each feature in a Pandas DataFrame.
+# import statsmodels
 
-    Parameters:
-    - df (DataFrame): Input Pandas DataFrame
-    - features (list of str): List of feature names to test
-    - threshold (float): VIF threshold to drop for multicollinearity
+# print(statsmodels.__version__)
 
-    Returns:
-    - keep_cols: [(feature, VIF)]
-    - drop_cols: [(feature, VIF)]
-    """
-    # Standardize features (important to avoid scale effects)
-    scaler = StandardScaler()
-    X = pd.DataFrame(scaler.fit_transform(df[features]), columns=features)
-
-    vif_scores = []
-    for i in range(X.shape[1]):
-        vif = variance_inflation_factor(X.values, i)
-        vif_scores.append((features[i], vif))
-
-    keep_cols = [(f, v) for f, v in vif_scores if v <= threshold]
-    drop_cols = [(f, v) for f, v in vif_scores if v > threshold]
-
-    return keep_cols, drop_cols
+# from statsmodels.stats.outliers_influence import variance_inflation_factor
+# from sklearn.preprocessing import StandardScaler
