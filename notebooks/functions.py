@@ -110,7 +110,7 @@ def train_eval_logistic_with_threshold(
     """Train Logistic Regression Model with threshold, outputs evaluation metrics and logs it to Wandb.
     Focuses on Default Class metrics, rather than weighted"""
     # Step 1: Train.
-    model = LogisticRegression(solver="lbfgs", C=1.0, max_iter=1000)
+    model = LogisticRegression(solver="lbfgs", C=1.0, max_iter=1000, penalty="l2")
     model.fit(X_train, y_train, sample_weight=sample_weight)
 
     # Step 2: Predict probabilities
@@ -118,9 +118,13 @@ def train_eval_logistic_with_threshold(
 
     # Step 3: Threshold tuning via PR curve
     precision, recall, thresholds = precision_recall_curve(y_test, y_proba)
-    f1_scores = 2 * precision * recall / (precision + recall + 1e-6)
-    best_thresh = thresholds[np.argmax(f1_scores)]
-    best_f1 = max(f1_scores)
+
+    # precision/recall are length N+1, thresholds is length N → align by skipping index 0
+    f1_scores = 2 * precision[1:] * recall[1:] / (precision[1:] + recall[1:] + 1e-12)
+
+    best_idx = int(np.argmax(f1_scores))
+    best_thresh = float(thresholds[best_idx])
+    best_f1 = float(f1_scores[best_idx])
 
     print(f"\n✅ Best F1 Score = {best_f1:.4f} at threshold = {best_thresh:.2f}")
 
@@ -143,7 +147,8 @@ def train_eval_logistic_with_threshold(
 
     # Step 5: Threshold F1 Score ==
     plt.figure(figsize=(7, 4))
-    plt.plot(thresholds, f1_scores[:-1], label="F1 Score")
+    plt.plot(thresholds, f1_scores, label="F1 Score")
+
     plt.axvline(
         best_thresh,
         color="red",
@@ -246,14 +251,19 @@ def run_model_checkpoint(
         columns=X_train_encoded.columns, fill_value=0
     )
 
+    # == Standarization ==
+    scaler = StandardScaler(with_mean=True, with_std=True)
+    X_train_scaled = scaler.fit_transform(X_train_encoded)
+    X_test_scaled = scaler.transform(X_test_encoded)
+
     # == Calculate sample weight ==
     sample_w = compute_sample_weight(class_weight="balanced", y=y_train)
 
     # == 4. Train, Threshold Tune, Evaluate, Wandb Log, Log Reg Model ==
     train_eval_logistic_with_threshold(
-        X_train=X_train_encoded,
+        X_train=X_train_scaled,
         y_train=y_train,
-        X_test=X_test_encoded,
+        X_test=X_test_scaled,
         y_test=y_test,
         sample_weight=sample_w,
         model_type="Logistic Regression",
