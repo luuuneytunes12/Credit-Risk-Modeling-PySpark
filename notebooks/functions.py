@@ -97,7 +97,229 @@ load_dotenv()
 wandb.login(key=os.getenv("WANDB_API_KEY"))
 
 
-#! Latest
+# == Outlier Handling ===
+def winsorise_col_percentile(
+    df: DataFrame,
+    col_name: str,
+    lower_pct: float = 0.005,  # e.g., 0.5% quantile
+    upper_pct: float = 0.995,  # e.g., 99.5% quantile
+    rel_err: float = 1e-3,
+) -> DataFrame:
+    """
+    Winsorises a column by capping values below/above percentile thresholds.
+
+    Args:
+        df (DataFrame): Input Spark DataFrame
+        col_name (str): Column to winsorise
+        lower_pct (float): Lower quantile (default 0.005 = 0.5%)
+        upper_pct (float): Upper quantile (default 0.995 = 99.5%)
+        rel_err (float): Relative error for approxQuantile
+
+    Returns:
+        DataFrame: With winsorised column
+    """
+    print(
+        f"✅ Winsorising column: {col_name} using percentiles {lower_pct*100:.2f}%–{upper_pct*100:.2f}% ..."
+    )
+
+    # Compute quantiles
+    quantiles = df.approxQuantile(col_name, [lower_pct, upper_pct], rel_err)
+    if len(quantiles) == 2:
+        q_low, q_high = quantiles
+        df = df.withColumn(
+            col_name,
+            when(col(col_name) < q_low, q_low)
+            .when(col(col_name) > q_high, q_high)
+            .otherwise(col(col_name)),
+        )
+        return df
+    else:
+        print(
+            f"⚠️ Could not compute quantiles for column '{col_name}'. Is the column empty or all NaN?"
+        )
+    return df
+
+    #
+
+
+def winsorise_col(df, col_name, operator: str, condition_val, final_val):
+    """
+    Winsorises a column by replacing values above a certain condition with a final value.
+
+    Args:
+        df (DataFrame): The input DataFrame.
+        col_name (str): The name of the column to winsorise.
+        condition_val (float): The value above which to replace with final_val (cut-off)
+        final_val (float): The value to replace with.
+
+    Returns:
+        DataFrame: The DataFrame with the winsorised column.
+    """
+    print("✅ Winsorising column:", col_name, "...")
+
+    if operator == "<":
+        return df.withColumn(
+            col_name,
+            when(col(col_name) < condition_val, final_val).otherwise(col(col_name)),
+        )
+
+    elif operator == ">":
+        return df.withColumn(
+            col_name,
+            when(col(col_name) > condition_val, final_val).otherwise(col(col_name)),
+        )
+
+
+def retain_rows(
+    df: DataFrame, col_name: str, condition_val: float, operator: str
+) -> DataFrame:
+    """
+    Retains rows in the DataFrame where the specified column meets a condition.
+
+    Returns:
+        DataFrame: The DataFrame with the specified rows dropped.
+    """
+
+    if operator == "<=":
+        return df.filter(col(col_name) <= condition_val)
+
+    elif operator == "<":
+        return df.filter(col(col_name) < condition_val)
+
+    elif operator == ">":
+        return df.filter(col(col_name) > condition_val)
+
+    elif operator == ">=":
+        return df.filter(col(col_name) >= condition_val)
+
+    else:
+        raise ValueError("Operator must be '>=' or '<='")
+
+
+def compute_outlier_pct(df, col_name, lower_pct=0.25, upper_pct=0.75):
+    """Computes pct of outliers per column based on IQR method"""
+
+    # 1. Compute percentile bounds
+    quantiles = df.approxQuantile(col_name, [lower_pct, upper_pct], 0.01)
+    q1, q3 = quantiles[0], quantiles[1]
+    iqr = q3 - q1
+
+    # 2. Obtain lower and upper bound, any data points outside of this are seen as outliers
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    total_rows = df.count()
+
+    return round(
+        df.filter((col(col_name) < lower_bound) | (col(col_name) > upper_bound)).count()
+        / total_rows
+        * 100,
+        2,
+    )
+
+
+def display_distributions(df):
+    """Takes in Spark Dataframe. Samples it and display distribution for skewness checking"""
+    # 1. Select numerical columns
+    numeric_cols = sorted(
+        [
+            field.name
+            for field in df.schema.fields
+            if isinstance(field.dataType, NumericType)
+        ]
+    )
+
+    # 2. Sample small portion of data (e.g., 5%) and convert to pandas
+    sample_df = df.select(numeric_cols).sample(fraction=0.1, seed=42)
+    sample_pdf = sample_df.toPandas()
+
+    # 3. Plot histograms as subplots
+    n_cols = 3  # Number of plots per row
+    n_rows = (len(numeric_cols) + n_cols - 1) // n_cols
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 4 * n_rows))
+    axes = axes.flatten()
+
+    for i, col_name in enumerate(numeric_cols):
+        axes[i].hist(sample_pdf[col_name].dropna(), bins=50, color="skyblue")
+        axes[i].set_title(col_name, fontsize=10)
+        axes[i].tick_params(axis="x", rotation=45)
+
+    # Hide any unused subplots
+    for j in range(i + 1, len(axes)):
+        axes[j].axis("off")
+
+    plt.tight_layout()
+    plt.show()
+
+
+def inspect_outliers(
+    df,
+    columns: list,
+    sample_size: int = 5,
+    method: str = "iqr",  # "iqr" or "percentile"
+    lower_pct: float = 0.01,  # used if method="percentile"
+    upper_pct: float = 0.99,  # used if method="percentile"
+):
+    total_count = df.count()
+
+    for col_name in columns:
+        try:
+            print(f"\n📊 Inspecting Outliers for Column: `{col_name}`")
+
+            if method == "iqr":
+                q1, q3 = df.approxQuantile(col_name, [0.25, 0.75], 0.01)
+                iqr = q3 - q1
+                lower = q1 - 1.5 * iqr
+                upper = q3 + 1.5 * iqr
+                print(f"IQR Method | Q1 = {q1}, Q3 = {q3}, IQR = {iqr}")
+                print(f"Lower Bound = {lower}, Upper Bound = {upper}")
+
+            elif method == "percentile":
+                # Get both percentile bounds
+                lower, upper = df.approxQuantile(col_name, [lower_pct, upper_pct], 0.01)
+
+                # NEW: also inspect the max value
+                max_val = df.agg(F.max(df[col_name]).alias("max")).first()["max"]
+                print(
+                    f"Percentile Method | Lower (p{int(lower_pct*100)}) = {lower}, "
+                    f"Upper (p{int(upper_pct*100)}) = {upper}"
+                )
+                print(f"🔝 Max({col_name}) = {max_val}")
+
+                # OPTIONAL: show a few rows at the exact max
+                df.filter(df[col_name] == max_val).select(col_name).show(
+                    min(sample_size, 5)
+                )
+
+            else:
+                print(f"❌ Unknown method `{method}`. Skipping column `{col_name}`.")
+                continue
+
+            # Count outliers
+            outlier_count = df.filter(
+                (df[col_name] < lower) | (df[col_name] > upper)
+            ).count()
+            outlier_pct = round(outlier_count / total_count * 100, 2)
+            print(f"Outlier Count: {outlier_count} ({outlier_pct}%)")
+
+            # Sample outliers top and bottom
+            print(f"🔼 Top Outliers (>{upper}):")
+            df.filter(df[col_name] > upper).select(col_name).orderBy(
+                df[col_name].desc()
+            ).show(sample_size)
+
+            print(f"🔽 Bottom Outliers (<{lower}):")
+            df.filter(df[col_name] < lower).select(col_name).orderBy(
+                df[col_name].asc()
+            ).show(sample_size)
+
+        except Exception as e:
+            print(f"❌ Could not process column `{col_name}`: {str(e)}")
+
+
+# == PD Modeling ==
+
+
 def train_eval_logistic_with_threshold(
     X_train,
     y_train,
@@ -342,76 +564,3 @@ def calculate_vif_pandas(df, features, threshold=5.0):
     drop_cols = [(f, v) for f, v in vif_scores if v > threshold]
 
     return keep_cols, drop_cols
-
-
-#! Spark Final Model Training
-def oot_train_test_split(
-    initial_df: DataFrame, date_cut_off: str
-) -> tuple[DataFrame, DataFrame]:
-    """
-    Takes in Pyspark Dataframe.
-    Conducts out-of-time split according to issue_d column, returning (train_df , test_df)
-
-    """
-    initial_df = initial_df.withColumn("issue_d", to_date(col("issue_d"), "yyyy-MM-dd"))
-    initial_df = initial_df.orderBy(col("issue_d").asc())
-    train_df = initial_df.where(col("issue_d") < to_date(lit(date_cut_off)))
-    test_df = initial_df.where(col("issue_d") >= to_date(lit(date_cut_off)))
-
-    return (train_df, test_df)
-
-
-def add_class_weightage_cols(train_df) -> DataFrame:
-    """
-    Implement same logic as 'balanced' class in sklearn (give more importance to rare class during training)
-
-    Adds class_weight column to TRAIN_DATASET
-    """
-
-    # Count examples in each class
-    major_count = train_df.filter(train_df.default_status == 0).count()
-    minor_count = train_df.filter(train_df.default_status == 1).count()
-    total_count = train_df.count()
-
-    # Calculate weights (inverse frequency)
-    weight_for_0 = total_count / (2 * major_count)
-    weight_for_1 = total_count / (2 * minor_count)
-
-    # Add a column for sample weights
-    train_df = train_df.withColumn(
-        "class_weight_col",
-        F.when(train_df.default_status == 0, weight_for_0).otherwise(weight_for_1),
-    )
-
-    return train_df
-
-
-def build_one_hot_encoding_pipeline(df):
-    """
-    Turns all categories (<string_type>) into one_hot_encoded columns and returns Spark DataFrame
-    """
-    cat_features = [
-        feature.name
-        for feature in df.schema.fields
-        if isinstance(feature.dataType, StringType)
-    ]
-
-    # Create stages for Pipeline: Indexers + Encoders
-    stages = []
-    for cat_feature in cat_features:
-        # StringIndexer stage
-        if df.select(cat_feature).distinct().count() > 1:
-            indexer = StringIndexer(
-                inputCol=cat_feature, outputCol=f"{cat_feature}_idx"
-            )
-            # OneHotEncoder stage (uses indexer's output)
-            encoder = OneHotEncoder(
-                inputCol=f"{cat_feature}_idx",
-                outputCol=f"{cat_feature}_one_hot_encoded",
-                dropLast=True,
-            )
-            stages.extend([indexer, encoder])
-
-    return Pipeline(stages=stages)
-
-
