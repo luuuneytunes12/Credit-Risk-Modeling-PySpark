@@ -47,15 +47,22 @@ I will be utilising the Crisp-DM Data Science Framework seen below to maintain d
 
 3. Apply **comprehensive model evaluation** techniques that meet the stringent requirements of Basel III financial regulations
 
-## 3. Project Directory Guideline
+## 3. Technical Workflow & Architecture
+
+- Medallion architecture with PySpark for scalable data engineering and processing.
+- Data preprocessing, feature engineering with Pandas in Jupyter notebooks.
+- ML modeling with Scikit-learn, XGBoost, experiments logged in Weights & Biases (similar ML logging interface to MlFlow)
+
+## 4. Project Directory Guideline
 
 - **data/**: Output by Pyspark Medallion Architecture
 - **images/**: Contains images needed for storytelling and visualisations
 - **notebooks/**: Contains Jupyter notebooks for data preprocessing, model building and model evaluation
 - **sandbox/**: For data exploration tasks (e.g. identify issues with data for subsequent data preocessing)
 
-## 4. Tech Stack
+## 5. Tools & Technologies
 
+- **Azure Databricks**: Aborted operation since I ran out of student credits mid-project (But experienced Databricks Key Features such as Spark Clusters, Catalog, Orchestration of Compute Workflows, SparkML etc)
 - **PySpark** Big Data Processing & Engineering / Medallion Architecture
 - **Pandas / Numpy**: Data Sampling, Data Preprocessing, Feature Engineering
 - **Seaborn / Matplotlib**: Data Visualisation
@@ -63,10 +70,43 @@ I will be utilising the Crisp-DM Data Science Framework seen below to maintain d
 - **XGBoost** Gradient Boosting Ensemble Modeling
 - **Wandb (Weights & Biases)**: For logging machine learning models performance & metrics (for easy visual comparison and complying to data science workflow guidelines)
 
-## 5. Lessons Learnt
+## 6. Skills Acquired
 
-## 6. To Start
+- **Knowledge of Credit Risk Domain**: Key domain terminologies & knowledge of common machine learning models (e.g. LGD, EAD Modeling, Survival Analysis, Beta / Multiple Linear Regression, Ensemble Models such as Bagging, Boosting, Stacking mechanisms)
+- **Azure Databricks** (Knowledge of Databricks Workspace, Notebooks, Clusters, Delta Tables)
+- **Pyspark** (Syntax & Big Data Processing / Cleaning Skills, Attachment of Clusters -> Notebooks, Integration with Databricks, Knowledge of SparkML library)
+- **Pandas/Numpy**: Data Analysis, Feature Engineering
+- **Sci-Kit Learn**: Machine Learning & Usage of Pipeline and custom classes (for feature engineering / data preprocessing)
+- **Feature Engineering Techniques**: Domain based interaction feature creation e.g. ways of feature selection (e.g. WoE)
+- **Practical Machine Learning Modeling**: Explored classification models (e.g. Logistic Regression & XGBoost), understanding their evaluation metrics and typical ways of tuning hyperparamters
+- **Typical Data Science Workflow**: Understood the concepts of experiments & runs in Machine Learning & key platforms like Mlflow & WandB used for comparison of results between models / experiments
+
+## 7. To Start
 
 1. Clone the repo
 2. Install packages & libraries via `pip install -r requirements.txt`
-3. Run `*.ipynb` files in `notebooks/`
+3. Run `*.ipynb` files in `notebooks/` in sequence 
+
+## 8. Model Results
+
+The following results are based on the default class. This is because in credit risk modeling, we care more about capturing highly possible defaulted loans. 
+
+##### 8.1 **Logistic Regression Model**
+
+| Metric        | Value | What It Means                                                                                 |
+| ------------- | ----- | --------------------------------------------------------------------------------------------- |
+| **Precision** | 0.30  | When the model predicted "positive", it was right about **30%** of the time.                  |
+| **Recall**    | 0.65  | The model caught about **63%** of all actual positives.                                       |
+| **F1 Score**  | 0.40  | Balance between precision & recall — good for seeing trade-off.                               |
+| **Gini**      | 0.40  | Measure of model's ability to rank correctly; higher means better separation between classes. |
+
+##### 8.2 **XGBoost Model**
+
+| Metric        | Value | What It Means                                                                                 |
+| ------------- | ----- | --------------------------------------------------------------------------------------------- |
+| **Precision** | 0.320 | When the model predicted "positive", it was right about **30%** of the time.                  |
+| **Recall**    | 0.740 | The model caught about **63%** of all actual positives.                                       |
+| **F1 Score**  | 0.447 | Balance between precision & recall — good for seeing trade-off.                               |
+| **Gini**      | 0.422 | Measure of model's ability to rank correctly; higher means better separation between classes. |
+
+For further explanation of the model results, please refer to individual model notebooks. 
