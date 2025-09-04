@@ -95,18 +95,18 @@ The following results are based on the default class. This is because in credit 
 
 | Metric        | Value | What It Means                                                                                 |
 | ------------- | ----- | --------------------------------------------------------------------------------------------- |
-| **Precision** | 0.30  | When the model predicted "positive", it was right about **30%** of the time.                  |
-| **Recall**    | 0.65  | The model caught about **63%** of all actual positives.                                       |
+| **Precision** | 0.28  | When the model predicted "positive", it was right about **30%** of the time.                  |
+| **Recall**    | 0.67  | The model caught about **63%** of all actual positives.                                       |
 | **F1 Score**  | 0.40  | Balance between precision & recall — good for seeing trade-off.                               |
-| **Gini**      | 0.40  | Measure of model's ability to rank correctly; higher means better separation between classes. |
+| **Gini**      | 0.38  | Measure of model's ability to rank correctly; higher means better separation between classes. |
 
 ##### 8.2 **XGBoost Model**
 
 | Metric        | Value | What It Means                                                                                 |
 | ------------- | ----- | --------------------------------------------------------------------------------------------- |
-| **Precision** | 0.320 | When the model predicted "positive", it was right about **30%** of the time.                  |
-| **Recall**    | 0.740 | The model caught about **63%** of all actual positives.                                       |
-| **F1 Score**  | 0.447 | Balance between precision & recall — good for seeing trade-off.                               |
-| **Gini**      | 0.422 | Measure of model's ability to rank correctly; higher means better separation between classes. |
+| **Precision** | 0.320 | When the model predicted "positive", it was right about **32%** of the time.                  |
+| **Recall**    | 0.740 | The model caught about **74%** of all actual positives.                                       |
+| **F1 Score**  | 0.447 | Balance between precision & recall — good for seeing trade-off, (in default class)              |
+| **Gini**      | 0.422 | Model separates default and non-default classes better with the tuned XGBoost model |
 
 For further explanation of the model results, please refer to individual model notebooks. 
