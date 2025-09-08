@@ -132,7 +132,7 @@ In the notebook `06_metrics_calculations.ipynb`, we calculated the financial imp
 - Compared Logistic Regression (baseline) and XGBoost (improved) models based on recall, precision, and financial metrics across the years 
 - Quantified the reduction in financial losses due to improved default detection by XGBoost.
 
-The XGBoost model managed to reduce financial losses via credit by up to 10.4% across the years.
+The XGBoost model managed to reduce financial losses via credit by up to 10.4% from base Logistic Regression model across the years.
 
 ## 10. Next Steps for Project Improvement
 To further enhance this credit risk modeling project, we can:
