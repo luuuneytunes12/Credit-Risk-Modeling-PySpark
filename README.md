@@ -68,6 +68,7 @@ I will be utilising the Crisp-DM Data Science Framework seen below to maintain d
 - **Seaborn / Matplotlib**: Data Visualisation
 - **Scikit-learn**: Machine Learning / Model Evaluation
 - **XGBoost** Gradient Boosting Ensemble Modeling
+- **Random Forest**: Stacking Ensemble Model
 - **Wandb (Weights & Biases)**: For logging machine learning models performance & metrics (for easy visual comparison and complying to data science workflow guidelines)
 
 ## 6. Skills Acquired
@@ -78,7 +79,7 @@ I will be utilising the Crisp-DM Data Science Framework seen below to maintain d
 - **Pandas/Numpy**: Data Analysis, Feature Engineering
 - **Sci-Kit Learn**: Machine Learning & Usage of Pipeline and custom classes (for feature engineering / data preprocessing)
 - **Feature Engineering Techniques**: Domain based interaction feature creation e.g. ways of feature selection (e.g. WoE)
-- **Practical Machine Learning Modeling**: Explored classification models (e.g. Logistic Regression & XGBoost), understanding their evaluation metrics and typical ways of tuning hyperparamters
+- **Practical Machine Learning Modeling**: Explored classification models (e.g. Logistic Regression & XGBoost & Random Forest), understanding their evaluation metrics and typical ways of tuning hyperparamters
 - **Typical Data Science Workflow**: Understood the concepts of experiments & runs in Machine Learning & key platforms like Mlflow & WandB used for comparison of results between models / experiments
 
 ## 7. To Start
