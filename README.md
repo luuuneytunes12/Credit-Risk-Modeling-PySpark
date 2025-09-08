@@ -68,12 +68,12 @@ I will be utilising the Crisp-DM Data Science Framework seen below to maintain d
 - **Seaborn / Matplotlib**: Data Visualisation
 - **Scikit-learn**: Machine Learning / Model Evaluation
 - **XGBoost** Gradient Boosting Ensemble Modeling
-- **Random Forest**: Stacking Ensemble Model
+- **Random Forest**: Bagging Ensemble Model
 - **Wandb (Weights & Biases)**: For logging machine learning models performance & metrics (for easy visual comparison and complying to data science workflow guidelines)
 
 ## 6. Skills Acquired
 
-- **Knowledge of Credit Risk Domain**: Key domain terminologies & knowledge of common machine learning models (e.g. LGD, EAD Modeling, Survival Analysis, Beta / Multiple Linear Regression, Ensemble Models such as Bagging, Boosting, Stacking mechanisms)
+- **Knowledge of Credit Risk Domain**: Key domain terminologies & knowledge of common machine learning models (e.g. LGD, EAD Modeling, Survival Analysis, Beta / Multiple Linear Regression, Ensemble Models such as Bagging, Boosting, Bagging mechanisms)
 - **Azure Databricks** (Knowledge of Databricks Workspace, Notebooks, Clusters, Delta Tables)
 - **Pyspark** (Syntax & Big Data Processing / Cleaning Skills, Attachment of Clusters -> Notebooks, Integration with Databricks, Knowledge of SparkML library)
 - **Pandas/Numpy**: Data Analysis, Feature Engineering
