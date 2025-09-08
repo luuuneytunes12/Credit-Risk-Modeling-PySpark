@@ -109,4 +109,35 @@ The following results are based on the default class. This is because in credit 
 | **F1 Score**  | 0.45 | Balance between precision & recall — good for seeing trade-off, (in default class)              |
 | **Gini**      | 0.422 | Model separates default and non-default classes better with the tuned XGBoost model |
 
+##### 8.3 **Random Forest Model**
+
+| Metric        | Value | What It Means                                                                                 |
+| ------------- | ----- | --------------------------------------------------------------------------------------------- |
+| **Precision** | 0.351 | When the model predicted "positive", it was right about **35%** of the time.                  |
+| **Recall**    | 0.566 | The model caught about **56%** of all actual positives.                                       |
+| **F1 Score**  | 0.433 | Balance between precision & recall — good for seeing trade-off, (in default class)              |
+| **Gini**      | 0.390 | Model separates default and non-default classes better with the tuned XGBoost model |
+
 For further explanation of the model results, please refer to individual model notebooks. 
+
+
+## 9. Business Metrics Calculation 
+Among the models tested, XGBoost emerged as the best-performing model, achieving the highest recall (74%) and F1 score (0.45) for the default class, while raising a OK number of false alarms from the baseline model. This indicates that the XGBoost model was the most effective at identifying high-risk loans while maintaining a reasonable balance between precision and recall. The Gini coefficient of 0.422 further highlights its superior ability to separate default and non-default classes compared to Logistic Regression and Random Forest models.
+
+
+![Metrics Overview](images/metrics.png)
+
+In the notebook `06_metrics_calculations.ipynb`, we calculated the financial impact of implementing the XGBoost model for credit risk assessment. Mainly, I did the following: 
+- Calculated overall default rate across the years and total loan amount 
+- Compared Logistic Regression (baseline) and XGBoost (improved) models based on recall, precision, and financial metrics across the years 
+- Quantified the reduction in financial losses due to improved default detection by XGBoost.
+
+The XGBoost model managed to reduce financial losses via credit by up to 10.4% across the years.
+
+## 10. Next Steps for Project Improvement
+To further enhance this credit risk modeling project, we can:
+  - Build more application, behavioural, collection, propensity models 
+  - Monitor model performance and observe drift 
+  - Containerize scripts to adhere to MLOps best practices 
+
+By focusing on these areas, we can build a more comprehensive and effective credit risk management system, covering different real-life machine learning models used in banks.
